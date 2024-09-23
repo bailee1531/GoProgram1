@@ -10,25 +10,28 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 )
 
 type Player struct {
-	firstName   string
-	lastName    string
-	singles     float64
-	doubles     float64
-	triples     float64
-	homeRuns    float64
-	atBats      float64
-	walks       float64
-	hitByPitch  float64
-	plateAppear float64
+	firstName  string
+	lastName   string
+	batAvg     float64
+	sluggPerc  float64
+	onBasePerc float64
+}
+
+type ErrorLine struct {
+	firstName    string
+	lastName     string
+	errorType    string
+	errorLineNum int
 }
 
 func CalcBattingAvg(hits, atBats float64) float64 {
-	batAvg := (hits) / atBats
+	batAvg := hits / atBats
 	return batAvg
 }
 
@@ -57,6 +60,23 @@ func CheckData(stats []string) bool {
 	return isValid
 }
 
+func OutputPlayers(playerList Player) {
+	fmt.Printf("%s,\t", playerList.lastName)
+	fmt.Printf("%s\t\t", playerList.firstName)
+	fmt.Printf("%.3f\t\t", playerList.batAvg)
+	fmt.Printf("%.3f\t\t", playerList.sluggPerc)
+	fmt.Printf("%.3f\t", playerList.onBasePerc)
+	fmt.Printf("\n")
+}
+
+func OutputErrors(errorList ErrorLine) {
+	fmt.Printf("Line %d:\t", errorList.errorLineNum)
+	fmt.Printf("%s, ", errorList.lastName)
+	fmt.Printf("%s: ", errorList.firstName)
+	fmt.Printf("%s\t", errorList.errorType)
+	fmt.Printf("\n")
+}
+
 func main() {
 	var keyboard *bufio.Scanner
 	var fileLines *bufio.Scanner
@@ -66,6 +86,7 @@ func main() {
 	numPlayers = 0
 	lineNum = 0
 	var playerList []*Player
+	var errorList []*ErrorLine
 
 	fmt.Println("Enter your file name")
 	keyboard.Scan()
@@ -77,7 +98,7 @@ func main() {
 		fmt.Println("Exiting program.")
 		os.Exit(1)
 	} else {
-		fmt.Println("\n" + fileName + " was opened successfully")
+		fmt.Println("\n" + fileName + " was opened successfully\n")
 	}
 
 	fileLines = bufio.NewScanner(inFile)
@@ -86,51 +107,69 @@ func main() {
 		stats := strings.Split(fileLines.Text(), " ")
 		lineNum++
 		var currPlayer Player
+		var error ErrorLine
 		if len(stats) == 10 && CheckData(stats[2:]) {
 			numPlayers++
+
 			currPlayer.firstName = stats[0]
 			currPlayer.lastName = stats[1]
-			plateAppear := currPlayer.plateAppear
-			plateAppear, _ = strconv.ParseFloat(strings.TrimSpace(stats[2]), 64)
-			atBats := currPlayer.atBats
-			atBats, _ = strconv.ParseFloat(strings.TrimSpace(stats[3]), 64)
-			singles := currPlayer.singles
-			singles, _ = strconv.ParseFloat(strings.TrimSpace(stats[4]), 64)
-			doubles := currPlayer.doubles
-			doubles, _ = strconv.ParseFloat(strings.TrimSpace(stats[5]), 64)
-			triples := currPlayer.triples
-			triples, _ = strconv.ParseFloat(strings.TrimSpace(stats[6]), 64)
-			homeRuns := currPlayer.homeRuns
-			homeRuns, _ = strconv.ParseFloat(strings.TrimSpace(stats[7]), 64)
-			walks := currPlayer.walks
-			walks, _ = strconv.ParseFloat(strings.TrimSpace(stats[8]), 64)
-			hitByPitch := currPlayer.hitByPitch
-			hitByPitch, _ = strconv.ParseFloat(strings.TrimSpace(stats[9]), 64)
+
+			plateAppear, _ := strconv.ParseFloat(strings.TrimSpace(stats[2]), 64)
+			atBats, _ := strconv.ParseFloat(strings.TrimSpace(stats[3]), 64)
+			singles, _ := strconv.ParseFloat(strings.TrimSpace(stats[4]), 64)
+			doubles, _ := strconv.ParseFloat(strings.TrimSpace(stats[5]), 64)
+			triples, _ := strconv.ParseFloat(strings.TrimSpace(stats[6]), 64)
+			homeRuns, _ := strconv.ParseFloat(strings.TrimSpace(stats[7]), 64)
+			walks, _ := strconv.ParseFloat(strings.TrimSpace(stats[8]), 64)
+			hitByPitch, _ := strconv.ParseFloat(strings.TrimSpace(stats[9]), 64)
 
 			hits := singles + doubles + triples + homeRuns
 			batAvg := CalcBattingAvg(hits, atBats)
 			sluggPerc := CalcSlugg(singles, doubles, triples, homeRuns, atBats)
 			obp := CalcOBP(hits, walks, hitByPitch, plateAppear)
+
+			currPlayer.batAvg = batAvg
+			currPlayer.sluggPerc = sluggPerc
+			currPlayer.onBasePerc = obp
 			playerList = append(playerList, &currPlayer)
-			fmt.Printf("%s\t%s:\t%.3f\t%.3f\t%.3f\n", stats[0], stats[1], batAvg, sluggPerc, obp)
+
 		} else if len(stats) < 10 {
-			currPlayer.lastName = stats[0]
-			currPlayer.firstName = stats[1]
-			stats[2] = "Line contains not enough data"
-			playerList = append(playerList, &currPlayer)
-			fmt.Printf("Line %d: %s,\t%s: %s\n", lineNum, stats[0], stats[1], stats[2])
+			error.firstName = stats[0]
+			error.lastName = stats[1]
+			error.errorType = "Line contains not enough data"
+			error.errorLineNum = lineNum
+			errorList = append(errorList, &error)
+
 		} else if !CheckData(stats) {
-			currPlayer.lastName = stats[0]
-			currPlayer.firstName = stats[1]
-			stats[2] = "Line contains invalid data"
-			playerList = append(playerList, &currPlayer)
-			fmt.Printf("Line %d: %s,\t%s: %s\n", lineNum, stats[0], stats[1], stats[2])
+			error.firstName = stats[0]
+			error.lastName = stats[1]
+			error.errorType = "Line contains invalid data"
+			error.errorLineNum = lineNum
+			errorList = append(errorList, &error)
 		}
 	}
 
-	fmt.Printf("BASEBALL STATS REPORT -------- %d PLAYERS FOUND", numPlayers)
-	//fmt.Println("ERROR LINES FOUND IN INPUT DATA")
-	//fmt.Println("----------------------------")
+	sort.Slice(playerList, func(i, j int) bool {
+		return playerList[i].sluggPerc > playerList[j].sluggPerc
+	})
+
+	sort.Slice(errorList, func(i, j int) bool {
+		return errorList[i].errorLineNum < errorList[j].errorLineNum
+	})
+
+	fmt.Printf("BASEBALL STATS REPORT -------- %d PLAYERS FOUND IN FILE\n\n", numPlayers)
+	fmt.Printf("PLAYER NAME:\t\tAVERAGE\t\tSLUGGING\tONBASE%%\n")
+	for i := 0; i < len(playerList); i++ {
+		OutputPlayers(*playerList[i])
+	}
+
+	fmt.Printf("\n")
+
+	fmt.Printf("ERROR LINES FOUND IN INPUT DATA\n")
+	fmt.Println("-------------------------------")
+	for i := 0; i < len(errorList); i++ {
+		OutputErrors(*errorList[i])
+	}
 
 	defer inFile.Close()
 }
