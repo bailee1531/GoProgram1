@@ -9,6 +9,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -32,13 +33,28 @@ func CalcBattingAvg(hits, atBats float64) float64 {
 }
 
 func CalcSlugg(singles, doubles, triples, homeRuns, atBats float64) float64 {
-	sluggPerc := ((singles + 2.0) * (doubles + 3) * (triples + 4) * homeRuns) / atBats
+	sluggPerc := ((singles) + (2 * doubles) + (3 * triples) + (4 * homeRuns)) / atBats
 	return sluggPerc
 }
 
 func CalcOBP(hits, walks, hitByPitch, plateAppear float64) float64 {
 	obp := (hits + walks + hitByPitch) / plateAppear
 	return obp
+}
+
+func CheckData(stats []string) bool {
+	var checkData = regexp.MustCompile("^[0-9]+$")
+	var isValid bool
+	for i := 0; i < len(stats); i++ {
+		if checkData.MatchString(stats[i]) {
+			isValid = true
+			continue
+		} else {
+			isValid = false
+			break
+		}
+	}
+	return isValid
 }
 
 func main() {
@@ -65,50 +81,56 @@ func main() {
 	}
 
 	fileLines = bufio.NewScanner(inFile)
-	stats := strings.Split(keyboard.Text(), " ")
 
 	for fileLines.Scan() {
+		stats := strings.Split(fileLines.Text(), " ")
 		lineNum++
 		var currPlayer Player
-		if len(stats) == 9 {
+		if len(stats) == 10 && CheckData(stats[2:]) {
+			numPlayers++
 			currPlayer.firstName = stats[0]
 			currPlayer.lastName = stats[1]
-			singles := currPlayer.singles
-			singles, _ = strconv.ParseFloat(strings.TrimSpace(stats[2]), 64)
-			doubles := currPlayer.doubles
-			doubles, _ = strconv.ParseFloat(strings.TrimSpace(stats[3]), 64)
-			triples := currPlayer.triples
-			triples, _ = strconv.ParseFloat(strings.TrimSpace(stats[4]), 64)
-			homeRuns := currPlayer.homeRuns
-			homeRuns, _ = strconv.ParseFloat(strings.TrimSpace(stats[5]), 64)
-			atBats := currPlayer.atBats
-			atBats, _ = strconv.ParseFloat(strings.TrimSpace(stats[6]), 64)
-			walks := currPlayer.walks
-			walks, _ = strconv.ParseFloat(strings.TrimSpace(stats[7]), 64)
-			hitByPitch := currPlayer.hitByPitch
-			hitByPitch, _ = strconv.ParseFloat(strings.TrimSpace(stats[8]), 64)
 			plateAppear := currPlayer.plateAppear
-			plateAppear, _ = strconv.ParseFloat(strings.TrimSpace(stats[9]), 64)
+			plateAppear, _ = strconv.ParseFloat(strings.TrimSpace(stats[2]), 64)
+			atBats := currPlayer.atBats
+			atBats, _ = strconv.ParseFloat(strings.TrimSpace(stats[3]), 64)
+			singles := currPlayer.singles
+			singles, _ = strconv.ParseFloat(strings.TrimSpace(stats[4]), 64)
+			doubles := currPlayer.doubles
+			doubles, _ = strconv.ParseFloat(strings.TrimSpace(stats[5]), 64)
+			triples := currPlayer.triples
+			triples, _ = strconv.ParseFloat(strings.TrimSpace(stats[6]), 64)
+			homeRuns := currPlayer.homeRuns
+			homeRuns, _ = strconv.ParseFloat(strings.TrimSpace(stats[7]), 64)
+			walks := currPlayer.walks
+			walks, _ = strconv.ParseFloat(strings.TrimSpace(stats[8]), 64)
+			hitByPitch := currPlayer.hitByPitch
+			hitByPitch, _ = strconv.ParseFloat(strings.TrimSpace(stats[9]), 64)
 
 			hits := singles + doubles + triples + homeRuns
 			batAvg := CalcBattingAvg(hits, atBats)
 			sluggPerc := CalcSlugg(singles, doubles, triples, homeRuns, atBats)
 			obp := CalcOBP(hits, walks, hitByPitch, plateAppear)
 			playerList = append(playerList, &currPlayer)
-			fmt.Printf("%s\t%s:\t%f\t%f\t%f", stats[0], stats[1], batAvg, sluggPerc, obp)
-		} else {
+			fmt.Printf("%s\t%s:\t%.3f\t%.3f\t%.3f\n", stats[0], stats[1], batAvg, sluggPerc, obp)
+		} else if len(stats) < 10 {
 			currPlayer.lastName = stats[0]
 			currPlayer.firstName = stats[1]
 			stats[2] = "Line contains not enough data"
 			playerList = append(playerList, &currPlayer)
 			fmt.Printf("Line %d: %s,\t%s: %s\n", lineNum, stats[0], stats[1], stats[2])
+		} else if !CheckData(stats) {
+			currPlayer.lastName = stats[0]
+			currPlayer.firstName = stats[1]
+			stats[2] = "Line contains invalid data"
+			playerList = append(playerList, &currPlayer)
+			fmt.Printf("Line %d: %s,\t%s: %s\n", lineNum, stats[0], stats[1], stats[2])
 		}
-
 	}
 
 	fmt.Printf("BASEBALL STATS REPORT -------- %d PLAYERS FOUND", numPlayers)
-	fmt.Println("ERROR LINES FOUND IN INPUT DATA")
-	fmt.Println("----------------------------")
+	//fmt.Println("ERROR LINES FOUND IN INPUT DATA")
+	//fmt.Println("----------------------------")
 
 	defer inFile.Close()
 }
